@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personenzähler</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+        color: #333;
+    }
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        font-size: 22px;
+        font-weight: 600;
+    }
+    .container {
+        padding: 15px;
+        max-width: 500px;
+        margin: auto;
+    }
+    .status {
+        font-size: 18px;
+        margin: 10px 0;
+        text-align: left;
+    }
+    .today {
+        font-size: 18px;
+        font-weight: 500;
+        margin: 10px 0 20px;
+        text-align: left;
+    }
+    select {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        margin-bottom: 20px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+    }
+    canvas {
+        width: 100% !important;
+        height: auto !important;
+    }
+    h3 {
+        font-size: 18px;
+        margin-bottom: 10px;
+        text-align: left;
+    }
+</style>
+</head>
+<body>
+
+<header>📋 Personenzähler</header>
+
+<div class="container">
+    <div class="status">
+        👥 Aktuell anwesend: <strong id="current">12</strong>
+    </div>
+    <div class="today">
+        Heute: <strong id="in">42 rein</strong> | <strong id="out">30 raus</strong>
+    </div>
+
+    <label for="monthSelect">Monatsübersicht</label>
+    <select id="monthSelect">
+        <option>Juni 2025</option>
+        <option>Mai 2025</option>
+    </select>
+
+    <h3>Ein- und Austritte pro Stunde</h3>
+    <canvas id="hourlyChart"></canvas>
+</div>
+
+<script>
+    const ctx = document.getElementById('hourlyChart').getContext('2d');
+    const hourlyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Array.from({ length: 24 }, (_, i) => i.toString()),
+            datasets: [
+                {
+                    label: 'Rein',
+                    data: [1,1,2,2,3,5,6,8,9,10,14,13,10,7,5,3,2,2,1,1,0,0,0,0],
+                    backgroundColor: '#007bff'
+                },
+                {
+                    label: 'Raus',
+                    data: [0,0,1,1,2,2,3,4,4,6,5,5,4,4,3,2,1,1,0,0,0,0,0,0],
+                    backgroundColor: '#e83e8c'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                x: { stacked: true },
+                y: { beginAtZero: true }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
