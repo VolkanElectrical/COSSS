@@ -1,113 +1,87 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Personenzähler</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        margin: 0;
-        padding: 0;
-        background: #fff;
-        color: #333;
-    }
-    header {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 15px;
-        border-bottom: 1px solid #eee;
-        font-size: 22px;
-        font-weight: 600;
-    }
-    .container {
-        padding: 15px;
-        max-width: 500px;
-        margin: auto;
-    }
-    .status {
-        font-size: 18px;
-        margin: 10px 0;
-        text-align: left;
-    }
-    .today {
-        font-size: 18px;
-        font-weight: 500;
-        margin: 10px 0 20px;
-        text-align: left;
-    }
-    select {
-        width: 100%;
-        padding: 10px;
-        font-size: 16px;
-        margin-bottom: 20px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-    }
-    canvas {
-        width: 100% !important;
-        height: auto !important;
-    }
-    h3 {
-        font-size: 18px;
-        margin-bottom: 10px;
-        text-align: left;
-    }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Personenzähler</title>
+  <style>
+    :root { --gap: 12px; }
+    body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; background:#0b1220; color:#e6edf3; }
+    header{ padding:16px; text-align:center; font-weight:600; font-size:18px; }
+    .grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:var(--gap); padding:var(--gap); }
+    .card{ background:#131c2b; border:1px solid #1f2a3c; border-radius:16px; padding:16px; text-align:center; }
+    .label{ color:#93a4bf; font-size:14px; margin-bottom:8px; }
+    .value{ font-size:36px; font-weight:700; }
+    .row{ display:flex; align-items:center; justify-content:center; gap:8px; }
+    .dot{ width:10px; height:10px; border-radius:50%; background:#6dd57a; box-shadow:0 0 8px #6dd57a; }
+    .muted{ color:#93a4bf; font-size:12px; text-align:center; padding:8px 16px 16px; }
+    .actions{ display:flex; justify-content:center; gap:12px; padding:0 0 16px; }
+    .btn{ background:#1a2640; border:1px solid #2b3a59; color:#e6edf3; padding:10px 14px; border-radius:10px; text-decoration:none; }
+    @media (max-width:720px){ .grid{ grid-template-columns:1fr; } .value{ font-size:44px; } }
+  </style>
 </head>
 <body>
+  <header>🚪 ESP32 Personenzähler</header>
 
-<header>📋 Personenzähler</header>
-
-<div class="container">
-    <div class="status">
-        👥 Aktuell anwesend: <strong id="current">12</strong>
+  <div class="grid">
+    <div class="card">
+      <div class="label">Eingetreten</div>
+      <div class="value" id="in">0</div>
     </div>
-    <div class="today">
-        Heute: <strong id="in">42 rein</strong> | <strong id="out">30 raus</strong>
+    <div class="card">
+      <div class="label">Ausgetreten</div>
+      <div class="value" id="out">0</div>
     </div>
+    <div class="card">
+      <div class="label">Aktuell im Raum</div>
+      <div class="value" id="current">0</div>
+    </div>
+  </div>
 
-    <label for="monthSelect">Monatsübersicht</label>
-    <select id="monthSelect">
-        <option>Juni 2025</option>
-        <option>Mai 2025</option>
-    </select>
+  <div class="actions">
+    <a class="btn" href="/upload">🔼 Dateien hochladen</a>
+    <a class="btn" href="/data.json" target="_blank">👀 Daten ansehen</a>
+  </div>
 
-    <h3>Ein- und Austritte pro Stunde</h3>
-    <canvas id="hourlyChart"></canvas>
-</div>
+  <p class="muted">
+    Live-Status: <span class="row"><span class="dot" id="dot"></span><span id="status">verbunden</span></span><br>
+    Letztes Update: <span id="last">–</span>
+  </p>
 
-<script>
-    const ctx = document.getElementById('hourlyChart').getContext('2d');
-    const hourlyChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Array.from({ length: 24 }, (_, i) => i.toString()),
-            datasets: [
-                {
-                    label: 'Rein',
-                    data: [1,1,2,2,3,5,6,8,9,10,14,13,10,7,5,3,2,2,1,1,0,0,0,0],
-                    backgroundColor: '#007bff'
-                },
-                {
-                    label: 'Raus',
-                    data: [0,0,1,1,2,2,3,4,4,6,5,5,4,4,3,2,1,1,0,0,0,0,0,0],
-                    backgroundColor: '#e83e8c'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'top' } },
-            scales: {
-                x: { stacked: true },
-                y: { beginAtZero: true }
-            }
-        }
-    });
-</script>
+  <script>
+    const elIn = document.getElementById('in');
+    const elOut = document.getElementById('out');
+    const elCur = document.getElementById('current');
+    const elLast = document.getElementById('last');
+    const elStatus = document.getElementById('status');
+    const elDot = document.getElementById('dot');
 
+    let ok = true;
+    function setStatus(good) {
+      ok = good;
+      elStatus.textContent = good ? 'verbunden' : 'getrennt';
+      elDot.style.background = good ? '#6dd57a' : '#ff6b6b';
+      elDot.style.boxShadow = good ? '0 0 8px #6dd57a' : '0 0 8px #ff6b6b';
+    }
+
+    async function loadData() {
+      try {
+        const r = await fetch('/data.json', { cache: 'no-store' });
+        if (!r.ok) throw new Error(r.statusText);
+        const data = await r.json();
+        elIn.textContent = data.in ?? 0;
+        elOut.textContent = data.out ?? 0;
+        elCur.textContent = data.current ?? 0;
+        elLast.textContent = new Date().toLocaleTimeString();
+        if (!ok) setStatus(true);
+      } catch (e) {
+        setStatus(false);
+      }
+    }
+
+    // sofort und dann alle 2s
+    loadData();
+    setInterval(loadData, 2000);
+  </script>
 </body>
 </html>
