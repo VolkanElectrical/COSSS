@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>ESP32 Personenzähler – Details</title>
+  <style>
+    *{ box-sizing:border-box; }
+    body{ font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:0; background:#0b1220; color:#e6edf3; }
+    header{ padding:16px; display:flex; align-items:center; gap:12px; }
+    .btn{ background:#1a2640; border:1px solid #2b3a59; color:#e6edf3; padding:8px 12px; border-radius:10px; text-decoration:none; cursor:pointer; }
+    .wrap{ padding:16px; }
+
+    table{ width:100%; border-collapse:separate; border-spacing:0; background:#0f1626; border:1px solid #1f2a3c; border-radius:14px; overflow:hidden; }
+    thead th{ text-align:left; font-weight:600; color:#93a4bf; background:#0f1a2c; padding:12px; font-size:14px; }
+    tbody td{ padding:12px; border-top:1px solid #1f2a3c; font-size:14px; }
+    tbody tr:hover{ background:#0f1c34; }
+
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .muted{ color:#93a4bf; font-size:12px; margin-top:10px; }
+    .pill{ display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #2b3a59; background:#131c2b; font-size:12px; }
+    .ok{ color:#6dd57a; } .bad{ color:#ff6b6b; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="btn" href="/">← Zurück</a>
+    <div>📊 Detailansicht</div>
+    <div style="margin-left:auto" class="muted">Letztes Update: <span id="last">–</span></div>
+  </header>
+
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr><th>Feld</th><th>Wert</th></tr>
+      </thead>
+      <tbody id="tbody">
+        <!-- wird per JS gefüllt -->
+      </tbody>
+    </table>
+    <div class="muted">Diese Ansicht aktualisiert sich alle 2 Sekunden.</div>
+  </div>
+
+  <script>
+    const $ = (id)=>document.getElementById(id);
+    const tbody = $('tbody');
+    const last = $('last');
+
+    // Welche Keys in welcher Reihenfolge und wie darstellen
+    const fields = [
+      ['in', 'Eingetreten'],
+      ['out', 'Ausgetreten'],
+      ['current', 'Aktuell im Raum'],
+      ['last_event', 'Letztes Ereignis'],
+      ['uptime_ms', 'Uptime (ms)'],
+      ['ab_singleA', 'Abbrüche (Single A)'],
+      ['ab_singleB', 'Abbrüche (Single B)'],
+      ['ab_timeout', 'Abbrüche (Timeout)'],
+      ['discardA', 'Verworfen A (<200ms)'],
+      ['discardB', 'Verworfen B (<200ms)'],
+      ['stuckA', 'Stuck A erkannt'],
+      ['stuckB', 'Stuck B erkannt'],
+      ['last_ms', 'Zeitpunkt letztes Ereignis (ms seit Start)']
+    ];
+
+    function fmt(key, val){
+      if(val === undefined || val === null) return '–';
+      if(key === 'uptime_ms'){
+        const s = Math.floor(val/1000), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+        return `${h}h ${m}m ${ss}s  (${val} ms)`;
+      }
+      if(typeof val === 'number') return String(val);
+      return String(val);
+    }
+
+    function renderTable(d){
+      tbody.innerHTML = '';
+      for(const [key, label] of fields){
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td'); td1.textContent = label;
+        const td2 = document.createElement('td'); td2.className = 'mono'; td2.textContent = fmt(key, d[key]);
+        tr.appendChild(td1); tr.appendChild(td2);
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function load(){
+      const r = await fetch('/data.json', { cache:'no-store' });
+      if(!r.ok) throw new Error(r.statusText);
+      const d = await r.json();
+      renderTable(d);
+      last.textContent = new Date().toLocaleTimeString();
+    }
+
+    // Erstes Laden, dann Poll alle 2s
+    load().catch(()=>{});
+    setInterval(()=>load().catch(()=>{}), 2000);
+  </script>
+</body>
+</html>

@@ -15,20 +15,13 @@
     .label{ color:#93a4bf; font-size:14px; margin-bottom:8px; }
     .value{ font-size:36px; font-weight:700; }
 
-    .row{ display:flex; align-items:center; gap:8px; }
-    .dot{ width:10px; height:10px; border-radius:50%; background:#6dd57a; box-shadow:0 0 8px #6dd57a; }
-    .muted{ color:#93a4bf; font-size:12px; text-align:center; padding:0 16px 16px; }
-
     .actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:12px; padding:0 var(--gap) 12px; }
     .btn{ background:#1a2640; border:1px solid #2b3a59; color:#e6edf3; padding:10px 14px; border-radius:10px; text-decoration:none; cursor:pointer; }
     .btn:disabled{ opacity:.6; cursor:not-allowed; }
 
-    .panel{ background:#0f1626; border-top:1px solid #1f2a3c; padding:12px var(--gap) 18px; }
-    .panel h3{ margin:6px 0 10px; font-size:14px; color:#93a4bf; font-weight:600; }
-    .kv{ display:grid; grid-template-columns: 1fr auto; gap:8px 12px; font-size:14px; }
-    .kv div:nth-child(odd){ color:#93a4bf; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-
+    .muted{ color:#93a4bf; font-size:12px; text-align:center; padding:0 16px 16px; }
+    .row{ display:inline-flex; align-items:center; gap:8px; }
+    .dot{ width:10px; height:10px; border-radius:50%; background:#6dd57a; box-shadow:0 0 8px #6dd57a; }
     @media (max-width:840px){ .grid{ grid-template-columns:1fr; } .value{ font-size:42px; } }
   </style>
 </head>
@@ -51,10 +44,9 @@
   </div>
 
   <div class="actions">
-    <button class="btn" id="refreshBtn">🔄 Aktualisieren</button>
     <a class="btn" href="/upload">🔼 Dateien hochladen</a>
     <button class="btn" id="resetBtn" title="Zähler auf 0 setzen">♻️ Zähler zurücksetzen</button>
-    <a class="btn" href="/data.json" target="_blank" rel="noopener">👀 Rohdaten</a>
+    <a class="btn" href="/details.html">📊 Rohdaten</a>
   </div>
 
   <p class="muted">
@@ -62,97 +54,42 @@
     Letztes Update: <span id="last">–</span>
   </p>
 
-  <div class="panel">
-    <h3>Diagnose</h3>
-    <div class="kv mono">
-      <div>Letztes Ereignis</div><div id="last_event">–</div>
-      <div>Uptime</div><div id="uptime">–</div>
-      <div>Abbrüche (Single A)</div><div id="ab_singleA">0</div>
-      <div>Abbrüche (Single B)</div><div id="ab_singleB">0</div>
-      <div>Abbrüche (Timeout)</div><div id="ab_timeout">0</div>
-      <div>Verworfen A (&lt;200ms)</div><div id="discardA">0</div>
-      <div>Verworfen B (&lt;200ms)</div><div id="discardB">0</div>
-      <div>Stuck A erkannt</div><div id="stuckA">0</div>
-      <div>Stuck B erkannt</div><div id="stuckB">0</div>
-    </div>
-  </div>
-
   <script>
     const $ = (id)=>document.getElementById(id);
-    const el = {
-      in: $('in'), out: $('out'), current: $('current'),
-      last: $('last'), status: $('status'), dot: $('dot'),
-      last_event: $('last_event'), uptime: $('uptime'),
-      ab_singleA: $('ab_singleA'), ab_singleB: $('ab_singleB'), ab_timeout: $('ab_timeout'),
-      discardA: $('discardA'), discardB: $('discardB'),
-      stuckA: $('stuckA'), stuckB: $('stuckB'),
-      refreshBtn: $('refreshBtn'), resetBtn: $('resetBtn'),
-    };
-
+    const el = { in:$('in'), out:$('out'), current:$('current'), last:$('last'), status:$('status'), dot:$('dot'), resetBtn:$('resetBtn') };
     let ok = true;
-    function setStatus(good) {
+
+    function setStatus(good){
       ok = good;
       el.status.textContent = good ? 'verbunden' : 'getrennt';
       el.dot.style.background = good ? '#6dd57a' : '#ff6b6b';
       el.dot.style.boxShadow = good ? '0 0 8px #6dd57a' : '0 0 8px #ff6b6b';
     }
 
-    function fmtDuration(ms){
-      const s = Math.floor(ms/1000);
-      const h = Math.floor(s/3600);
-      const m = Math.floor((s%3600)/60);
-      const ss = s%60;
-      return `${h}h ${m}m ${ss}s`;
-    }
-
-    async function loadData() {
-      try {
-        el.refreshBtn.disabled = true;
-        const r = await fetch('/data.json', { cache: 'no-store' });
-        if (!r.ok) throw new Error(r.statusText);
+    async function loadData(){
+      try{
+        const r = await fetch('/data.json', { cache:'no-store' });
+        if(!r.ok) throw new Error(r.statusText);
         const d = await r.json();
-
         el.in.textContent = d.in ?? 0;
         el.out.textContent = d.out ?? 0;
         el.current.textContent = d.current ?? 0;
-
-        el.last_event.textContent = d.last_event ?? '–';
-        el.uptime.textContent = d.uptime_ms ? fmtDuration(d.uptime_ms) : '–';
-
-        el.ab_singleA.textContent = d.ab_singleA ?? 0;
-        el.ab_singleB.textContent = d.ab_singleB ?? 0;
-        el.ab_timeout.textContent = d.ab_timeout ?? 0;
-        el.discardA.textContent = d.discardA ?? 0;
-        el.discardB.textContent = d.discardB ?? 0;
-        el.stuckA.textContent = d.stuckA ?? 0;
-        el.stuckB.textContent = d.stuckB ?? 0;
-
         el.last.textContent = new Date().toLocaleTimeString();
-        if (!ok) setStatus(true);
-      } catch (e) {
-        setStatus(false);
-      } finally {
-        el.refreshBtn.disabled = false;
-      }
+        if(!ok) setStatus(true);
+      }catch(e){ setStatus(false); }
     }
 
-    el.refreshBtn.addEventListener('click', loadData);
-
-    el.resetBtn.addEventListener('click', async () => {
-      if (!confirm('Zähler wirklich auf 0 setzen?')) return;
-      try {
+    el.resetBtn.addEventListener('click', async ()=>{
+      if(!confirm('Zähler wirklich auf 0 setzen?')) return;
+      try{
         el.resetBtn.disabled = true;
-        const r = await fetch('/reset', { method: 'POST' });
-        if (r.ok) await loadData();
-        else alert('Reset fehlgeschlagen: ' + r.status);
-      } catch (e) {
-        alert('Reset fehlgeschlagen.');
-      } finally {
-        el.resetBtn.disabled = false;
-      }
+        const r = await fetch('/reset', { method:'POST' });
+        if(r.ok){ await loadData(); alert('Zähler wurden zurückgesetzt.'); }
+        else alert('Reset fehlgeschlagen: '+r.status);
+      }catch(e){ alert('Reset fehlgeschlagen.'); }
+      finally{ el.resetBtn.disabled = false; }
     });
 
-    // Sofort laden, dann alle 2s
     loadData();
     setInterval(loadData, 2000);
   </script>
