@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Personenzähler – Dashboard</title>
+  <style>
+    :root{
+      --bg:#f5f7fb; --panel:#ffffff; --muted:#6b7b8d; --text:#0e1116;
+      --accent:#2563eb; --ok:#16a34a; --warn:#b45309; --bad:#dc2626; --grid:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    a{color:var(--accent)}
+    .container{max-width:1200px;margin:24px auto;padding:0 16px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .brand{display:flex;gap:10px;align-items:center}
+    .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#22d3ee 60%);display:grid;place-items:center;color:#00131a;font-weight:800}
+    .pill{background:var(--panel);border:1px solid var(--grid);padding:6px 10px;border-radius:999px;color:var(--muted)}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .btn{border:1px solid var(--grid);background:var(--panel);color:var(--text);padding:10px 12px;border-radius:10px;cursor:pointer}
+    .btn:hover{border-color:var(--accent)}
+    .select,.input{appearance:none;border:1px solid var(--grid);background:var(--panel);color:var(--text);padding:10px 12px;border-radius:10px}
+    .tabs{display:flex;gap:6px;flex-wrap:wrap}
+    .tab{border:1px solid var(--grid);background:var(--panel);color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .tab[aria-selected="true"]{color:var(--text);border-color:var(--accent)}
+    .grid{display:grid;gap:12px}
+    .grid.cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .grid.flex2{grid-template-columns:2fr 1fr}
+    .grid.full{grid-template-columns:1fr}
+    @media (max-width:1000px){.grid.cards{grid-template-columns:repeat(2,1fr)}.grid.flex2{grid-template-columns:1fr}}
+    @media (max-width:600px){.grid.cards{grid-template-columns:1fr}}
+    .card{background:var(--panel);border:1px solid var(--grid);border-radius:16px;padding:14px}
+    .card h3{margin:0 0 8px 0;font-size:14px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+    .big{font-size:28px;font-weight:700}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .muted{color:var(--muted)}
+    .badge{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--grid);color:var(--muted)}
+    .divider{height:1px;background:var(--grid);margin:10px 0}
+    .footer{margin:18px 0;color:var(--muted);font-size:12px}
+    canvas{width:100%;height:240px;display:block}
+    .chart-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+    .legend-dot{width:10px;height:10px;border-radius:2px;background:var(--accent);display:inline-block;margin-right:6px}
+    .calendar{display:grid;grid-template-columns:repeat(53,1fr);gap:2px}
+    .day{width:100%;aspect-ratio:1/1;border-radius:3px;background:#eaf2ff;border:1px solid var(--grid)}
+    .day[data-lvl="1"]{background:#cfe3ff}
+    .day[data-lvl="2"]{background:#a9cdfd}
+    .day[data-lvl="3"]{background:#7db0fb}
+    .day[data-lvl="4"]{background:#4f90f5}
+    .day[data-lvl="5"]{background:#2c72e8}
+    .calendar-legend{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+    .calendar-legend .legend-box{width:18px;height:18px;border:1px solid var(--grid);border-radius:4px;display:inline-block}
+    .legend-0{background:#eaf2ff}
+    .legend-1{background:#cfe3ff}
+    .legend-2{background:#a9cdfd}
+    .legend-3{background:#7db0fb}
+    .legend-4{background:#4f90f5}
+    .legend-5{background:#2c72e8}
+    .legend-label{min-width:42px;text-align:center}
+    [data-view]{display:none}
+    [data-view].active{display:block}
+    .drawer{position:fixed;top:0;right:-500px;width:500px;max-width:100%;height:100%;background:var(--panel);border-left:1px solid var(--grid);box-shadow:-8px 0 24px rgba(0,0,0,.12);transition:right .25s ease;z-index:50;display:flex;flex-direction:column}
+    .drawer.open{right:0}
+    .drawer header{padding:12px;border-bottom:1px solid var(--grid)}
+    .drawer .content{padding:12px;overflow:auto}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo">PC</div>
+        <div>
+          <div style="font-weight:700">Personenzähler</div>
+          <div class="muted" id="subtitle">ESP32 • Letzte Aktualisierung –</div>
+        </div>
+      </div>
+      <div class="controls">
+        <span class="pill" id="status-pill"><span class="status-dot" id="status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:6px"></span><span id="status-text">Verbunden</span></span>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Ansichten">
+      <button class="tab" data-tab="#dash" aria-selected="true">Übersicht</button>
+      <button class="tab" data-tab="#heute">Heute</button>
+      <button class="tab" data-tab="#jahr">Jahr</button>
+      <button class="tab" data-tab="#events">Ereignisse</button>
+    </nav>
+
+    <section id="dash" data-view class="active">
+      <div class="grid cards" style="margin-top:12px">
+        <div class="card"><h3>Aktuelle Anwesende</h3><div class="big" id="kpi-present">–</div><div class="muted">Eintritte minus Austritte heute</div></div>
+        <div class="card"><h3>Eintritte (heute)</h3><div class="big" id="kpi-in-today">–</div><div class="badge" id="kpi-in-rate">–/h</div></div>
+        <div class="card"><h3>Austritte (heute)</h3><div class="big" id="kpi-out-today">–</div><div class="badge" id="kpi-out-rate">–/h</div></div>
+        <div class="card"><h3>Kapazität</h3><div class="big" id="kpi-capacity">–</div><div class="muted">Limit: <span id="kpi-limit">–</span></div></div>
+      </div>
+      <div class="grid flex2" style="margin-top:12px">
+        <div class="card">
+          <div class="row"><h3>Heute (kompakt)</h3>
+            <div class="chart-legend"><span><span class="legend-dot" style="background:var(--ok)"></span>Ein</span><span><span class="legend-dot" style="background:var(--bad)"></span>Aus</span><span><span class="legend-dot"></span>Belegung</span></div>
+          </div>
+          <canvas id="todayChart" height="220"></canvas>
+          <div class="row"><button class="btn" data-jump="#heute">Details ansehen</button><span class="muted" id="today-mini-label">—</span></div>
+        </div>
+        <div class="card">
+          <div class="row"><h3>System</h3><span class="muted" id="system-sub">—</span></div>
+          <div class="muted">Status: <strong id="status-brief">—</strong></div>
+          <div class="muted">Letztes Update: <span id="last-update">—</span></div>
+          <div class="divider"></div>
+          <div class="row">
+            <button class="btn" id="refresh-btn">Aktualisieren</button>
+            <button class="btn" data-jump="#jahr">Jahresübersicht</button>
+            <button class="btn" data-jump="#events">Live-Ereignisse</button>
+            <!-- Toggle -->
+            <button class="btn" id="y-scale-toggle" title="Y-Achse umschalten">Y: Fix 0–10</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="heute" data-view>
+      <div class="row" style="margin-top:12px">
+        <div class="controls" style="gap:8px">
+          <input class="input" type="date" id="date-input" />
+          <button class="btn" id="refresh-today">Aktualisieren</button>
+        </div>
+        <span class="spacer"></span>
+        <span class="muted" id="detail-label">—</span>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="row"><h3>Stündliche Ein-/Austritte</h3>
+          <div class="chart-legend"><span><span class="legend-dot" style="background:var(--ok)"></span>Ein</span><span><span class="legend-dot" style="background:var(--bad)"></span>Aus</span><span><span class="legend-dot"></span>Belegung</span></div>
+        </div>
+        <canvas id="todayChartFull" height="260"></canvas>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <table class="table" id="detail-table" style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums">
+          <thead><tr><th>Stunde</th><th>Ein</th><th>Aus</th><th>Belegung</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="jahr" data-view>
+      <div class="row" style="margin-top:12px">
+        <div class="controls" style="gap:8px">
+          <select class="select" id="year-select"></select>
+          <button class="btn" id="export-btn">CSV exportieren</button>
+        </div>
+        <span class="spacer"></span>
+        <div class="muted">Jahr: <span id="year-label">—</span> • Summe Ein: <span id="sum-in">—</span> • Summe Aus: <span id="sum-out">—</span></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="row">
+          <h3>Jahresübersicht</h3>
+          <div class="calendar-legend" aria-label="Legende">
+            <span>Weniger</span>
+            <span class="legend-box legend-0" title="0"></span>
+            <span class="legend-box legend-1" title="Stufe 1"></span>
+            <span class="legend-box legend-2" title="Stufe 2"></span>
+            <span class="legend-box legend-3" title="Stufe 3"></span>
+            <span class="legend-box legend-4" title="Stufe 4"></span>
+            <span class="legend-box legend-5" title="Stufe 5"></span>
+            <span>Mehr</span>
+          </div>
+        </div>
+        <div id="calendar" class="calendar" role="grid" aria-label="Heatmap Kalender"></div>
+        <div class="divider"></div>
+        <div class="muted">Klicke auf einen Tag, um Details im Seitenfenster zu öffnen.</div>
+      </div>
+    </section>
+
+    <section id="events" data-view>
+      <div class="card" style="margin-top:12px">
+        <div class="row"><h3>Live-Ereignisse</h3><span class="muted" id="live-sub">—</span><span class="spacer"></span><button class="btn" id="refresh-events">Aktualisieren</button></div>
+        <div id="live-log" style="max-height:420px;overflow:auto;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"></div>
+      </div>
+    </section>
+
+    <div class="footer">© <span id="year-now"></span> ESP32 Personenzähler • Lokale Oberfläche (arbeitet offline, nutzt /api/... wenn verfügbar)</div>
+  </div>
+
+  <aside class="drawer" id="drawer">
+    <header class="row"><h3 id="drawer-title">Details</h3><span class="spacer"></span><button class="btn" id="drawer-close">Schließen</button></header>
+    <div class="content">
+      <div class="card">
+        <div class="row"><h3>Stündliche Werte</h3><span class="muted" id="drawer-label">—</span></div>
+        <canvas id="drawerChart" height="260"></canvas>
+        <div class="divider"></div>
+        <table class="table" id="drawer-table" style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums">
+          <thead><tr><th>Stunde</th><th>Ein</th><th>Aus</th><th>Belegung</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    // ===== API =====
+    const API = {
+      current: '/api/current',
+      today:   (iso)=>`/api/day?date=${iso}`,
+      year:    (y)=>`/api/year?year=${y}`,
+      events:  '/api/events?limit=50'
+    };
+
+    // ===== Utils =====
+    const $ = (id)=>document.getElementById(id);
+    const fmtI = (n)=>Intl.NumberFormat('de-DE').format(Math.round(n||0));
+    const fmtDT = (d)=>new Intl.DateTimeFormat('de-DE',{dateStyle:'medium', timeStyle:'medium'}).format(d);
+    const todayISO = ()=> new Date().toISOString().slice(0,10);
+
+    function setStatus(ok, msg){
+      const dot = $('status-dot');
+      const text = $('status-text');
+      dot.style.background = ok ? 'var(--ok)' : 'var(--warn)';
+      text.textContent = msg || (ok?'Verbunden':'Offline – Demo-Daten');
+      const brief = $('status-brief');
+      if(brief) brief.textContent = text.textContent;
+    }
+
+    // ===== Demo-Daten =====
+    function demoDay(dateStr){
+      const seed = [...dateStr].reduce((a,c)=>a+c.charCodeAt(0),0);
+      const rand = (i)=> (Math.sin(seed+i)*10000)%1;
+      let hour=[...Array(24).keys()], In=[], Out=[], Present=[]; let p=0;
+      for(let h=0;h<24;h++){
+        let rush = (h>=8&&h<=10)||(h>=16&&h<=19);
+        let ein = Math.max(0, Math.round(rand(h+1)*(rush?15:6)));
+        let aus = Math.max(0, Math.round(rand(h+2)*(rush?14:5)));
+        p = Math.max(0, p + ein - aus);
+        In.push(ein); Out.push(aus); Present.push(p);
+      }
+      return {hour, in:In, out:Out, present:Present};
+    }
+    function demoYear(year){
+      const d0 = new Date(`${year}-01-01`);
+      const arr=[];
+      for(let i=0;i<366;i++){
+        const d = new Date(d0); d.setDate(d0.getDate()+i);
+        if(d.getFullYear()!=year) break;
+        const iso = d.toISOString().slice(0,10);
+        const day = demoDay(iso);
+        arr.push({date:iso, in: day.in.reduce((a,b)=>a+b,0), out: day.out.reduce((a,b)=>a+b,0)});
+      }
+      return arr;
+    }
+    async function fetchJSON(url){
+      try{
+        const r = await fetch(url, {cache:'no-store'});
+        if(!r.ok) throw new Error(r.status+':'+url);
+        return await r.json();
+      }catch(e){ return null; }
+    }
+
+    // ===== Chart Renderer (Toggle: Auto ↔ Fix 0..10) =====
+    let Y_MODE = localStorage.getItem('y_mode') || 'fixed'; // 'fixed' | 'auto'
+    const FIXED_SCALE = { min:0, max:10, step:1 };
+    function buildTicks(min, max, step){ const a=[]; for(let v=min; v<=max; v+=step) a.push(v); return a; }
+    function niceScale(max){
+      if(!isFinite(max) || max<=0) return {max:1, step:1, ticks:[0,1]};
+      const exp = Math.floor(Math.log10(max)), base = Math.pow(10, exp), n = max / base;
+      let step; if(n<=1) step=0.2*base; else if(n<=2) step=0.5*base; else if(n<=5) step=1.0*base; else step=2.0*base;
+      const maxTick = Math.ceil(max/step)*step;
+      const ticks=[]; for(let v=0; v<=maxTick+1e-9; v+=step) ticks.push(v);
+      return {max:maxTick, step, ticks};
+    }
+    function getScale(series){
+      if (Y_MODE==='fixed'){
+        return { max: FIXED_SCALE.max, ticks: buildTicks(FIXED_SCALE.min, FIXED_SCALE.max, FIXED_SCALE.step) };
+      } else {
+        const maxVal = Math.max(1, ...(series.in||[]), ...(series.out||[]), ...(series.present||[]));
+        const s = niceScale(maxVal);
+        return { max: s.max, ticks: s.ticks };
+      }
+    }
+    function drawYScale(ctx, x, y, w, h, ticks, maxY){
+      const style = getComputedStyle(document.documentElement);
+      const grid  = style.getPropertyValue('--grid');
+      const muted = style.getPropertyValue('--muted');
+      ctx.save();
+      ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.lineWidth=1;
+      ticks.forEach(v=>{
+        const py = Math.round(y + h - (v/Math.max(1,maxY))*h) + 0.5;
+        ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x+w, py); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x-6, py); ctx.lineTo(x, py); ctx.stroke();
+        ctx.fillText(String(v), x-8, py);
+      });
+      ctx.restore();
+    }
+    function drawAxes(ctx, x, y, w, h){
+      const grid = getComputedStyle(document.documentElement).getPropertyValue('--grid');
+      ctx.strokeStyle = grid; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y+h); ctx.lineTo(x+w, y+h); ctx.stroke();
+    }
+    function drawBars(ctx, x, y, w, h, values, color, maxY){
+      const bw = w/values.length*0.8; const gap = (w/values.length-bw);
+      ctx.fillStyle = color;
+      for(let i=0;i<values.length;i++){
+        const v  = Math.max(0, values[i]||0);
+        const vv = Math.min(v, maxY);
+        const bh = (vv/Math.max(1,maxY))*h;
+        const bx = x + i*(bw+gap) + gap/2;
+        const by = y + h - bh;
+        ctx.fillRect(bx, by, bw, Math.max(1,bh));
+      }
+    }
+    function drawLine(ctx, x, y, w, h, values, color, maxY){
+      ctx.strokeStyle = color; ctx.lineWidth=2; ctx.beginPath();
+      for(let i=0;i<values.length;i++){
+        const v  = Math.max(0, values[i]||0);
+        const vv = Math.min(v, maxY);
+        const px = x + i*(w/(values.length-1));
+        const py = y + h - (vv/Math.max(1,maxY))*h;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+    function renderChartOn(canvasId, series){
+      const c = document.getElementById(canvasId); if(!c) return;
+      const ctx = c.getContext('2d');
+      const dpr = window.devicePixelRatio||1;
+      const width=c.clientWidth, height=c.clientHeight;
+      c.width=width*dpr; c.height=height*dpr; ctx.scale(dpr,dpr);
+      ctx.clearRect(0,0,width,height);
+
+      const scale = getScale(series);
+      const pad = { l:64, t:8, r:16, b:24 };
+      const w = width - pad.l - pad.r;
+      const h = height - pad.t - pad.b;
+
+      drawYScale(ctx, pad.l, pad.t, w, h, scale.ticks, scale.max);
+
+      const style = getComputedStyle(document.documentElement);
+      drawBars(ctx, pad.l, pad.t, w, h, series.in||[],      style.getPropertyValue('--ok'),     scale.max);
+      drawBars(ctx, pad.l, pad.t, w, h, series.out||[],     style.getPropertyValue('--bad'),    scale.max);
+      drawLine(ctx, pad.l, pad.t, w, h, series.present||[], style.getPropertyValue('--accent'), scale.max);
+
+      drawAxes(ctx, pad.l, pad.t, w, h);
+      ctx.fillStyle = style.getPropertyValue('--muted');
+      ctx.font='12px system-ui'; ctx.textAlign='center';
+      for(let i=0;i<24;i+=3){
+        const x = pad.l + i*(w/23);
+        ctx.fillText(String(i).padStart(2,'0'), x, height-6);
+      }
+    }
+
+    // ===== Kalender / Heatmap =====
+    function buildCalendar(yearData){
+      const cal = $('calendar'); cal.innerHTML='';
+      const year = new Date(yearData[0]?.date || `${(new Date()).getFullYear()}-01-01`).getFullYear();
+      $('year-label').textContent = year;
+
+      const totals = yearData.reduce((a,d)=>{a.in+=d.in; a.out+=d.out; return a;},{in:0,out:0});
+      $('sum-in').textContent = fmtI(totals.in); $('sum-out').textContent = fmtI(totals.out);
+
+      const maxIn = Math.max(1, ...yearData.map(d=>d.in));
+      const d0 = new Date(`${year}-01-01`);
+      const weekday = (d0.getDay()+6)%7; // Montag-Start
+      for(let i=0;i<weekday;i++){
+        const e=document.createElement('div'); e.className='day'; e.setAttribute('data-lvl','0'); e.style.opacity=.5; cal.appendChild(e);
+      }
+      yearData.forEach(d=>{
+        const lvl = Math.min(5, Math.ceil((d.in/maxIn)*5));
+        const e = document.createElement('button');
+        e.className='day'; e.setAttribute('data-lvl', String(lvl));
+        e.title=`${d.date}: Ein ${d.in}, Aus ${d.out}`;
+        e.addEventListener('click',()=>openDrawerForDate(d.date));
+        cal.appendChild(e);
+      });
+    }
+
+    // ===== Tabellen =====
+    function renderDetailTable(targetId, day){
+      const tb = $(targetId).querySelector('tbody'); tb.innerHTML='';
+      for(let h=0;h<24;h++){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${h.toString().padStart(2,'0')}:00</td><td>${fmtI(day.in[h]||0)}</td><td>${fmtI(day.out[h]||0)}</td><td>${fmtI(day.present[h]||0)}</td>`;
+        tb.appendChild(tr);
+      }
+    }
+
+    // ===== CSV Export =====
+    function exportCSV(yearData){
+      const header = 'date,in,out\n';
+      const rows = yearData.map(d=>`${d.date},${d.in},${d.out}`).join('\n');
+      const blob = new Blob([header+rows], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=`personenzaehler_${$('year-label').textContent}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }
+
+    // ===== Daten-Lader =====
+    async function loadCurrent(){
+      let data = await fetchJSON(API.current);
+      if(!data){
+        const today = demoDay(todayISO());
+        data = {present: today.present.at(-1), in_today: today.in.reduce((a,b)=>a+b,0), out_today: today.out.reduce((a,b)=>a+b,0), in_total: 0, out_total: 0, limit: 120, ts: Date.now()};
+        setStatus(false);
+      }else{ setStatus(true); }
+      $('kpi-present').textContent = fmtI(data.present);
+      $('kpi-in-today').textContent = fmtI(data.in_today);
+      $('kpi-out-today').textContent = fmtI(data.out_today);
+      $('kpi-limit').textContent = fmtI(data.limit||0);
+      $('kpi-capacity').textContent = fmtI(Math.max(0,(data.limit||0) - (data.present||0)))+' frei';
+      $('kpi-in-rate').textContent = Math.round((data.in_today/Math.max(1,(new Date()).getHours()+1)))+"/h";
+      $('kpi-out-rate').textContent= Math.round((data.out_today/Math.max(1,(new Date()).getHours()+1)))+"/h";
+      $('subtitle').textContent = 'ESP32 • Letzte Aktualisierung – '+fmtDT(new Date(data.ts||Date.now()));
+      const lu = $('last-update'); if(lu) lu.textContent = fmtDT(new Date(data.ts||Date.now()));
+      const ss = $('system-sub'); if(ss) ss.textContent = 'Läuft lokal';
+    }
+
+    async function loadToday(dateStr){
+      const iso = dateStr || $('date-input')?.value || todayISO();
+      const di = $('date-input'); if(di) di.value = iso;
+      let day = await fetchJSON(API.today(iso));
+      if(!day){ day = demoDay(iso); setStatus(false); }
+      day.date = iso;
+      renderChartOn('todayChart', day);
+      renderChartOn('todayChartFull', day);
+      renderDetailTable('detail-table', day);
+      const dl = $('detail-label'); if(dl) dl.textContent = new Date(iso).toLocaleDateString('de-DE',{dateStyle:'full'});
+      const tml = $('today-mini-label'); if(tml) tml.textContent = new Date(iso).toLocaleDateString('de-DE',{dateStyle:'medium'});
+    }
+
+    async function loadYear(year){
+      const sel = $('year-select');
+      const y = year || Number(sel.value) || (new Date()).getFullYear();
+      sel.value = y;
+      let ydata = await fetchJSON(API.year(y));
+      if(!ydata){ ydata = demoYear(y); setStatus(false); }
+      buildCalendar(ydata);
+      $('export-btn').onclick = ()=>exportCSV(ydata);
+      return ydata;
+    }
+
+    async function loadEvents(){
+      let events = await fetchJSON(API.events);
+      const box = $('live-log');
+      if(!events){
+        events = Array.from({length:15},()=>({ts: Date.now()-Math.random()*3600e3, dir: Math.random()>0.5?'in':'out'}));
+      }
+      events.sort((a,b)=>b.ts-a.ts);
+      box.innerHTML = events.map(e=>`<div>${new Date(e.ts).toLocaleTimeString('de-DE')} — <strong>${e.dir==='in'?'Eintritt':'Austritt'}</strong></div>`).join('');
+      $('live-sub').textContent = `${events.length} Ereignisse (neueste zuerst)`;
+    }
+
+    async function openDrawerForDate(iso){
+      const day = await (async ()=>{ const d = await fetchJSON(API.today(iso)); return d || demoDay(iso); })();
+      const dr = $('drawer');
+      dr.classList.add('open');
+      $('drawer-title').textContent = 'Details – ' + new Date(iso).toLocaleDateString('de-DE',{dateStyle:'medium'});
+      $('drawer-label').textContent = new Date(iso).toLocaleDateString('de-DE',{dateStyle:'full'});
+      renderChartOn('drawerChart', {...day, date: iso});
+      renderDetailTable('drawer-table', {...day, date: iso});
+    }
+
+    // ===== Render-Cache + Toggle-Setup (muss vor init laufen) =====
+    (function setupYToggle(){
+      const btn = $('y-scale-toggle');
+      if(!btn) return;
+
+      // Cache letzte Daten pro Canvas
+      const _render = renderChartOn;
+      const last = { todayMini:null, todayFull:null, drawer:null };
+      window.renderChartOn = function(canvasId, series){
+        _render(canvasId, series);
+        if(canvasId==='todayChart')     last.todayMini = series;
+        if(canvasId==='todayChartFull') last.todayFull = series;
+        if(canvasId==='drawerChart')    last.drawer    = series;
+      };
+
+      const setLabel = ()=> btn.textContent = (Y_MODE==='fixed') ? 'Y: Fix' : 'Y: Auto';
+      setLabel();
+
+      btn.addEventListener('click', ()=>{
+        Y_MODE = (Y_MODE==='fixed') ? 'auto' : 'fixed';
+        localStorage.setItem('y_mode', Y_MODE);
+        setLabel();
+        if(last.todayMini) _render('todayChart', last.todayMini);
+        if(last.todayFull) _render('todayChartFull', last.todayFull);
+        if(last.drawer)    _render('drawerChart', last.drawer);
+      });
+    })();
+
+    // ===== Tabs & Events =====
+    function showView(id){
+      document.querySelectorAll('[data-view]').forEach(s=>s.classList.remove('active'));
+      const el = document.querySelector(id); if(el){ el.classList.add('active'); }
+      document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected', String(b.dataset.tab===id)));
+      window.location.hash = id.replace('#','');
+    }
+    document.querySelectorAll('.tab').forEach(b=> b.addEventListener('click', ()=> showView(b.dataset.tab)) );
+    document.querySelectorAll('[data-jump]').forEach(b=> b.addEventListener('click', ()=> showView(b.getAttribute('data-jump'))));
+    const rb = $('refresh-btn'); if(rb) rb.addEventListener('click', ()=>{ loadCurrent(); loadToday(); loadEvents(); });
+    const rt = $('refresh-today'); if(rt) rt.addEventListener('click', ()=>loadToday());
+    const re = $('refresh-events'); if(re) re.addEventListener('click', ()=>loadEvents());
+    const ys = $('year-select'); if(ys) ys.addEventListener('change', async (e)=>{ const y=Number(e.target.value); await loadYear(y); });
+    const di = $('date-input'); if(di) di.addEventListener('change', (e)=>loadToday(e.target.value));
+    const dc = $('drawer-close'); if(dc) dc.addEventListener('click', ()=> $('drawer').classList.remove('open'));
+
+    // ===== Polling =====
+    setInterval(()=>{ loadCurrent(); loadEvents(); loadToday(); }, 12_000);
+
+    // ===== Init =====
+    async function init(){
+      const y = (new Date()).getFullYear();
+      $('year-select').innerHTML = [y-1,y,y+1].map(v=>`<option value="${v}">${v}</option>`).join('');
+      $('year-now').textContent = y;
+      await loadCurrent(); await loadYear(y); await loadToday(); await loadEvents();
+      const hash = window.location.hash||'#dash'; showView(hash);
+    }
+    init();
+  </script>
+</body>
+</html>
